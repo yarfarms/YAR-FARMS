@@ -18,8 +18,8 @@ const cards = [
   {
     icon: Mail,
     label: 'Email Us',
-    value: 'reddyharsha095@gmail.com',
-    href: 'mailto:reddyharsha095@gmail.com',
+    value: 'yarfarms143@gmail.com',
+    href: 'mailto:yarfarms143@gmail.com,
     accent: 'from-earth to-forest',
   },
   {
