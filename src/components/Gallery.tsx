@@ -1,26 +1,61 @@
+
 import { useEffect, useState } from 'react';
-import { galleryImages, type GalleryImage } from '@/data/content';
+import { galleryImages as fallbackImages, type GalleryImage } from '@/data/content';
+import { fetchGalleryImages } from '@/lib/sanity';
 import { X, ChevronLeft, ChevronRight, ZoomIn } from 'lucide-react';
 
 export default function Gallery() {
+  const [images, setImages] = useState<GalleryImage[]>(fallbackImages);
   const [active, setActive] = useState<number | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+
+    fetchGalleryImages()
+      .then((items) => {
+        if (cancelled || items.length === 0) return;
+
+        const sanityImages: GalleryImage[] = items.map((item) => ({
+          src: item.src,
+          alt: item.alt || item.title,
+          category: item.category || 'Farm Views',
+        }));
+
+        setImages(sanityImages);
+      })
+      .catch((error) => {
+        console.error('Unable to load Sanity gallery; using fallback images.', error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (active === null) return;
+
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setActive(null);
-      if (e.key === 'ArrowRight') setActive((a) => (a === null ? a : (a + 1) % galleryImages.length));
-      if (e.key === 'ArrowLeft') setActive((a) => (a === null ? a : (a - 1 + galleryImages.length) % galleryImages.length));
+      if (e.key === 'ArrowRight') {
+        setActive((a) => a === null ? a : (a + 1) % images.length);
+      }
+      if (e.key === 'ArrowLeft') {
+        setActive((a) => a === null ? a : (a - 1 + images.length) % images.length);
+      }
     };
+
     window.addEventListener('keydown', onKey);
     document.body.style.overflow = 'hidden';
+
     return () => {
       window.removeEventListener('keydown', onKey);
       document.body.style.overflow = '';
     };
-  }, [active]);
+  }, [active, images.length]);
 
-  const current: GalleryImage | null = active === null ? null : galleryImages[active];
+  const current: GalleryImage | null =
+    active === null ? null : images[active] ?? null;
 
   return (
     <section id="gallery" className="section-pad bg-cream bg-grain dark:bg-[#0d1f10]">
@@ -36,13 +71,13 @@ export default function Gallery() {
         </div>
 
         <div className="mt-12 grid auto-rows-[220px] grid-cols-2 gap-4 sm:auto-rows-[260px] md:grid-cols-3 lg:grid-cols-4">
-          {galleryImages.map((img, i) => (
+          {images.map((img, i) => (
             <button
-              key={img.src}
+              key={`${img.src}-${i}`}
               onClick={() => setActive(i)}
               className={[
                 'reveal group relative overflow-hidden rounded-3xl shadow-soft focus:outline-none focus:ring-4 focus:ring-leaf/40',
-                img.span ? 'row-span-2' : '',
+                'span' in img && img.span ? 'row-span-2' : '',
               ].join(' ')}
               style={{ transitionDelay: `${i * 60}ms` }}
               aria-label={`Open image: ${img.alt}`}
@@ -68,7 +103,6 @@ export default function Gallery() {
         </div>
       </div>
 
-      {/* Lightbox */}
       {current && (
         <div
           className="fixed inset-0 z-[70] flex items-center justify-center bg-black/85 p-4 backdrop-blur-md"
@@ -84,23 +118,36 @@ export default function Gallery() {
           >
             <X className="h-5 w-5" />
           </button>
+
           <button
             className="absolute left-4 grid h-12 w-12 place-items-center rounded-full glass text-white transition-colors hover:bg-white/20 sm:left-8"
-            onClick={(e) => { e.stopPropagation(); setActive((a) => (a === null ? a : (a - 1 + galleryImages.length) % galleryImages.length)); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setActive((a) => a === null ? a : (a - 1 + images.length) % images.length);
+            }}
             aria-label="Previous image"
           >
             <ChevronLeft className="h-6 w-6" />
           </button>
+
           <figure className="max-h-[85vh] max-w-4xl" onClick={(e) => e.stopPropagation()}>
-            <img src={current.src} alt={current.alt} className="max-h-[78vh] w-auto rounded-2xl object-contain shadow-2xl" />
+            <img
+              src={current.src}
+              alt={current.alt}
+              className="max-h-[78vh] w-auto rounded-2xl object-contain shadow-2xl"
+            />
             <figcaption className="mt-4 text-center">
               <p className="text-xs font-600 uppercase tracking-widest text-leaf">{current.category}</p>
               <p className="text-sm text-white/85">{current.alt}</p>
             </figcaption>
           </figure>
+
           <button
             className="absolute right-4 grid h-12 w-12 place-items-center rounded-full glass text-white transition-colors hover:bg-white/20 sm:right-8"
-            onClick={(e) => { e.stopPropagation(); setActive((a) => (a === null ? a : (a + 1) % galleryImages.length)); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setActive((a) => a === null ? a : (a + 1) % images.length);
+            }}
             aria-label="Next image"
           >
             <ChevronRight className="h-6 w-6" />
